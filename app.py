@@ -1,92 +1,123 @@
 import streamlit as st
 import math
-import pandas as pd
 
 st.set_page_config(page_title="26 GHz Link Budget Tool", layout="wide")
 
-st.title("📡 26 GHz mmWave Wi-Fi Link Budget & RSSI Tool")
+# Custom CSS matching the HTML UI styling
+st.markdown("""
+<style>
+    .card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    .custom-table th, .custom-table td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: center;
+    }
+    .custom-table th {
+        background-color: #007bff;
+        color: white;
+    }
+    .ok {
+        color: green;
+        font-weight: bold;
+    }
+    .bad {
+        color: red;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-st.sidebar.header("🔧 Link Parameters")
-model_type = st.sidebar.radio("Select Model", ["Standard 802.11ax Model", "Nokia EIRP Model"])
+st.title("📡 26 GHz Link Budget & Far-End RSSI Calculator")
 
-col1, col2, col3 = st.columns(3)
+# Input Configuration Section
+with st.container():
+    st.subheader("Hardware & Link Configuration")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        dist = st.number_input("Distance (meters)", value=3000, step=100)
+        tx_pwr = st.number_input("Tx Power (dBm)", value=22.0, step=1.0)
+        
+    with col2:
+        tx_gain = st.number_input("Tx Antenna Gain (dBi)", value=31.0, step=1.0)
+        rx_gain = st.number_input("Rx Antenna Gain (dBi)", value=31.0, step=1.0)
+        
+    with col3:
+        mcs_str = st.selectbox("MCS Index", ["MCS 9 (256-QAM)", "MCS 7 (64-QAM)"])
+        mcs = 9 if "9" in mcs_str else 7
+        region_str = st.selectbox("Region", ["Southern India", "Northern India"])
+        region = "N" if "Northern" in region_str else "S"
+        
+    with col4:
+        rain_pct = st.number_input("Rain Impact %", value=0, min_value=0, max_value=100, step=5)
 
-with col1:
-    st.subheader("🌐 Distance & Rain")
-    distance_m = st.number_input("Distance (meters)", min_value=100, max_value=50000, value=3000, step=100)
-    region = st.selectbox("Region", ["Southern India (S)", "Northern India (N)"])
-    rain_impact_pct = st.slider("Rain Impact (% of Link)", 0, 100, 0, step=10)
-
-with col2:
-    st.subheader("📻 Transceiver & Antennas")
-    bandwidth_mhz = st.selectbox("Bandwidth (MHz)", [320, 160])
-    mcs = st.selectbox("MCS Index", [9, 7])
-    tx_conducted_dbm = st.number_input("Tx Conducted Power (dBm)", value=22)
-    tx_gain_dbi = st.number_input("Tx Antenna Gain (dBi)", value=31)
-    rx_gain_dbi = st.number_input("Rx Antenna Gain (dBi)", value=31)
-    tx_loss_db = st.number_input("Tx Cable/Chain Loss (dB)", value=0)
-    rx_loss_db = st.number_input("Rx Cable/Chain Loss (dB)", value=0)
-
-with col3:
-    st.subheader("📊 System Margins & Traffic")
-    dl_duty_pct = st.slider("Downlink Duty Cycle (%)", 0, 100, 70)
-    noise_figure_db = st.number_input("Noise Figure (dB)", value=5.2)
-
-# Calculations
-frequency_hz = 26e9
-pi_approx = 22 / 7
+# Calculations matching the HTML logic
+freq = 26e9
+pi = 22 / 7
 c = 3e8
 
-if model_type == "Standard 802.11ax Model":
-    path_loss = 20*math.log10(distance_m) + 20*math.log10(frequency_hz) + 20*math.log10((4*pi_approx)/c)
-    snr_req = 33 if mcs == 9 else 23
-    bits_per_carrier = 8 if mcs == 9 else 6
-    subcarriers = 3920 if bandwidth_mhz == 320 else 1960
-    phy_100 = (subcarriers * bits_per_carrier * 2 * (5/6)) / 13.6
-    sens_margin = 5
-    eirp = tx_conducted_dbm + tx_gain_dbi - tx_loss_db
-else:
-    path_loss = 10*2.1*math.log10(distance_m) + 20*math.log10(frequency_hz) + 6 + 20*math.log10((4*pi_approx)/c)
-    snr_req = 25 if mcs == 7 else 33
-    phy_100 = 2017.4 if bandwidth_mhz == 320 else 1008.7
-    sens_margin = 3
-    eirp = tx_conducted_dbm + tx_gain_dbi - tx_loss_db
+fspl = 20 * math.log10(dist) + 20 * math.log10(freq) + 20 * math.log10((4 * pi) / c)
+eirp = tx_pwr + tx_gain
+snr = 33 if mcs == 9 else 23
+sens = -174 + 10 * math.log10(320e6) + 5.2 + snr
+sens_with_margin = sens + 5
 
-sensitivity = -174 + 10*math.log10(bandwidth_mhz * 1e6) + noise_figure_db + snr_req
-sens_with_margin = sensitivity + sens_margin
+rates = [2.0, 6.9, 16.3] if region == "N" else [5.8, 15.5, 29.2]
+avails = ["99.9%", "99.99%", "99.999%"]
 
-reg_code = 'N' if "Northern" in region else 'S'
-rain_rates = {99.9: 2.0, 99.99: 6.9, 99.999: 16.3} if reg_code == 'N' else {99.9: 5.8, 99.99: 15.5, 99.999: 29.2}
-
-results = []
-for avail, rate in rain_rates.items():
-    r_loss = rate * (rain_impact_pct / 100.0) * (distance_m / 1000.0)
-    mapl = path_loss + r_loss
-    rssi = eirp + rx_gain_dbi - rx_loss_db - mapl
+table_rows = ""
+for i in range(3):
+    rain_loss = rates[i] * (rain_pct / 100.0) * (dist / 1000.0)
+    mapl = fspl + rain_loss
+    rssi = eirp + rx_gain - mapl
     margin = rssi - sens_with_margin
-    status = "✅ OK" if margin >= 0 else "❌ BAD"
+    ok = margin >= 0
     
-    results.append({
-        "Availability (%)": f"{avail}%",
-        "Total Path Loss (dB)": round(mapl, 2),
-        "Far-End RSSI (dBm)": round(rssi, 2),
-        "Link Margin (dB)": round(margin, 2),
-        "Status": status
-    })
+    status_class = "ok" if ok else "bad"
+    status_text = "OK" if ok else "BAD"
 
-st.divider()
+    table_rows += f"""
+    <tr>
+        <td>{avails[i]}</td>
+        <td>{mapl:.2f}</td>
+        <td><strong>{rssi:.2f}</strong></td>
+        <td>{sens_with_margin:.2f}</td>
+        <td>{margin:.2f}</td>
+        <td class="{status_class}">{status_text}</td>
+    </tr>
+    """
 
-res_col1, res_col2 = st.columns([2, 1])
+# Table Display HTML
+table_html = f"""
+<div class="card">
+    <h3 style="margin-top:0;">Far-End Receive Signal & Link Feasibility</h3>
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Availability</th>
+                <th>Total Path Loss (dB)</th>
+                <th>Far-End RSSI (dBm)</th>
+                <th>Sensitivity w/ Margin (dBm)</th>
+                <th>Link Margin (dB)</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {table_rows}
+        </tbody>
+    </table>
+</div>
+"""
 
-with res_col1:
-    st.subheader("📋 Far-End Signal & Availability Matrix")
-    st.table(pd.DataFrame(results))
-
-with res_col2:
-    st.subheader("🚀 Receiver & Throughput Stats")
-    dl_phy = (dl_duty_pct / 100.0) * phy_100
-    ul_phy = ((100 - dl_duty_pct) / 100.0) * phy_100
-    st.metric("Far-End Clear-Sky RSSI", f"{round(eirp + rx_gain_dbi - rx_loss_db - path_loss, 2)} dBm")
-    st.metric("Receiver Sensitivity (w/ Margin)", f"{round(sens_with_margin, 2)} dBm")
-    st.metric("DL Practical Throughput", f"{round(dl_phy * 0.75, 1)} Mbps")
-    st.metric("UL Practical Throughput", f"{round(ul_phy * 0.75, 1)} Mbps")
+st.markdown(table_html, unsafe_allow_html=True)
