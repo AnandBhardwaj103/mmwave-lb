@@ -1,42 +1,8 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import math
 
 st.set_page_config(page_title="26 GHz Link Budget Tool", layout="wide")
-
-# Custom CSS matching the HTML UI styling
-st.markdown("""
-<style>
-    .card {
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
-    .custom-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 15px;
-    }
-    .custom-table th, .custom-table td {
-        padding: 10px;
-        border: 1px solid #ddd;
-        text-align: center;
-    }
-    .custom-table th {
-        background-color: #007bff;
-        color: white;
-    }
-    .ok {
-        color: green;
-        font-weight: bold;
-    }
-    .bad {
-        color: red;
-        font-weight: bold;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 st.title("📡 26 GHz Link Budget & Far-End RSSI Calculator")
 
@@ -62,7 +28,7 @@ with st.container():
     with col4:
         rain_pct = st.number_input("Rain Impact %", value=0, min_value=0, max_value=100, step=5)
 
-# Calculations matching the HTML logic
+# Calculations
 freq = 26e9
 pi = 22 / 7
 c = 3e8
@@ -87,21 +53,63 @@ for i in range(3):
     status_class = "ok" if ok else "bad"
     status_text = "OK" if ok else "BAD"
 
-    table_rows += f"""
-    <tr>
+    table_rows += f"""<tr>
         <td>{avails[i]}</td>
         <td>{mapl:.2f}</td>
         <td><strong>{rssi:.2f}</strong></td>
         <td>{sens_with_margin:.2f}</td>
         <td>{margin:.2f}</td>
         <td class="{status_class}">{status_text}</td>
-    </tr>
-    """
+    </tr>"""
 
-# Table Display HTML
-table_html = f"""
+# Pure HTML/CSS rendered safely via components.html
+html_component = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body {{
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: transparent;
+    }}
+    .card {{
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        border: 1px solid #e1e4e8;
+    }}
+    .custom-table {{
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }}
+    .custom-table th, .custom-table td {{
+        padding: 12px;
+        border: 1px solid #ddd;
+        text-align: center;
+        font-size: 14px;
+    }}
+    .custom-table th {{
+        background-color: #007bff;
+        color: white;
+        font-weight: 600;
+    }}
+    .ok {{
+        color: #28a745;
+        font-weight: bold;
+    }}
+    .bad {{
+        color: #dc3545;
+        font-weight: bold;
+    }}
+</style>
+</head>
+<body>
 <div class="card">
-    <h3 style="margin-top:0;">Far-End Receive Signal & Link Feasibility</h3>
+    <h3 style="margin-top:0; font-size: 18px; color: #333;">Far-End Receive Signal & Link Feasibility</h3>
     <table class="custom-table">
         <thead>
             <tr>
@@ -118,6 +126,9 @@ table_html = f"""
         </tbody>
     </table>
 </div>
+</body>
+</html>
 """
 
-st.markdown(table_html, unsafe_allow_html=True)
+# Render HTML component directly
+components.html(html_component, height=280, scrolling=False)
