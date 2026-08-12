@@ -28,6 +28,14 @@ with st.container():
     with col4:
         rain_pct = st.number_input("Rain Impact %", value=0, min_value=0, max_value=100, step=5)
 
+# Dynamic Throughput Notification based on MCS Selection
+if mcs == 9:
+    dl_speed, ul_speed = "2 Gbps", "500 Mbps"
+else:
+    dl_speed, ul_speed = "1 Gbps", "300 Mbps"
+
+st.info(f"⚡ **Target Throughput (MCS {mcs}):** Downlink (DL): **{dl_speed}** | Uplink (UL): **{ul_speed}**")
+
 # Calculations
 freq = 26e9
 pi = 22 / 7
